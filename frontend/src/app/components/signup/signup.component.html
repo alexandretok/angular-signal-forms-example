@@ -19,8 +19,10 @@
             placeholder="you@example.com"
             autocomplete="email"
           />
-          @if (signupForm.email().touched() && signupForm.email().errors().length > 0) {
-            <span class="error">{{ signupForm.email().errors()[0].message }}</span>
+          @if (signupForm.email().errors().length > 0) {
+            @if (signupForm.email().touched() || signupForm.email().errors()[0].kind === 'emailTaken') {
+              <span class="error">{{ signupForm.email().errors()[0].message }}</span>
+            }
           }
           @if (signupForm.email().pending()) {
             <span class="pending">Checking availability...</span>

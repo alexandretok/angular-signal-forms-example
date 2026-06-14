@@ -4,9 +4,11 @@ import {
   email,
   minLength,
   validate,
-  validateHttp,
+  validateAsync,
   debounce,
+  validateHttp,
 } from '@angular/forms/signals';
+import { resource } from '@angular/core';
 import { PHONE_PATTERN } from '../phone-input/phone-input.model';
 import { SignupModel } from './signup.model';
 
@@ -14,6 +16,7 @@ export const validationSchema = schema<SignupModel>((path) => {
   required(path.email, { message: 'Email is required' });
   email(path.email, { message: 'Please enter a valid email address' });
   debounce(path.email, 500);
+
   validateHttp(path.email, {
     request: ({ value }) => `/api/check-email?email=${value()}`,
     onSuccess: (response: any) =>
@@ -22,6 +25,23 @@ export const validationSchema = schema<SignupModel>((path) => {
         : null,
     onError: () => ({ kind: 'networkError', message: 'Could not verify email availability' }),
   });
+
+  /* validateAsync(path.email, {
+    params: ({ value }) => value(),
+    factory: (emailParam) => resource({
+      params: emailParam,
+      loader: async ({ params: emailValue }) => {
+        const res = await fetch(`/api/check-email?email=${emailValue}`);
+        if (!res.ok) throw new Error('Request failed');
+        return await res.json();
+      },
+    }),
+    onSuccess: (result: any) =>
+      result.exists
+        ? { kind: 'emailTaken', message: 'This email is already registered' }
+        : undefined,
+    onError: () => ({ kind: 'networkError', message: 'Could not verify email availability' }),
+  }); */
 
   required(path.password, { message: 'Password is required' });
   minLength(path.password, 5, { message: 'Password must be at least 5 characters' });
