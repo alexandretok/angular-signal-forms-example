@@ -1,34 +1,38 @@
 import { Component, signal } from '@angular/core';
+import { FormControl, Validators, ReactiveFormsModule } from '@angular/forms';
 import {
-  form,
   FormField,
   submit,
   required,
   email,
-  minLength,
   validate,
   validateHttp,
   debounce,
 } from '@angular/forms/signals';
+import { compatForm } from '@angular/forms/signals/compat';
 import { PhoneInputComponent } from '../phone-input/phone-input.component';
 import { PHONE_PATTERN } from '../phone-input/phone-input.model';
-import { SignupModel } from './signup.model';
 
 @Component({
   selector: 'app-signup',
   standalone: true,
-  imports: [FormField, PhoneInputComponent],
+  imports: [FormField, PhoneInputComponent, ReactiveFormsModule],
   templateUrl: './signup.component.html',
   styleUrl: './signup.component.css',
 })
 export class SignupComponent {
-  model = signal<SignupModel>({
+  passwordControl = new FormControl('', [
+    Validators.required,
+    Validators.minLength(5),
+  ]);
+
+  model = signal({
     email: '',
-    password: '',
+    password: this.passwordControl,
     phone: '',
   });
 
-  signupForm = form(this.model, (s) => {
+  signupForm = compatForm(this.model, (s) => {
     required(s.email, { message: 'Email is required' });
     email(s.email, { message: 'Please enter a valid email address' });
     debounce(s.email, 1000);
@@ -40,9 +44,6 @@ export class SignupComponent {
           : null,
       onError: () => ({ kind: 'networkError', message: 'Could not verify email availability' }),
     });
-
-    required(s.password, { message: 'Password is required' });
-    minLength(s.password, 5, { message: 'Password must be at least 5 characters' });
 
     required(s.phone, { message: 'Phone number is required' });
     validate(s.phone, ({ value }) => {
@@ -67,7 +68,11 @@ export class SignupComponent {
           const response = await fetch('/api/signup', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(this.model()),
+            body: JSON.stringify({
+              email: this.signupForm.email().value(),
+              password: this.signupForm.password().value(),
+              phone: this.signupForm.phone().value(),
+            }),
           });
 
           const data = await response.json();
@@ -78,8 +83,9 @@ export class SignupComponent {
           }
 
           this.submitted.set(true);
-        } catch {
+        } catch (e) {
           this.submitError.set('Network error. Please try again.');
+          console.error(e);
         }
       },
       onInvalid(field, detail) {

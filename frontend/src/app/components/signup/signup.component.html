@@ -32,12 +32,16 @@
           <input
             id="password"
             type="password"
-            [formField]="signupForm.password"
+            [formControl]="passwordControl"
             placeholder="At least 5 characters"
             autocomplete="new-password"
           />
-          @if (signupForm.password().touched() && signupForm.password().errors().length > 0) {
-            <span class="error">{{ signupForm.password().errors()[0].message }}</span>
+          @if (passwordControl.touched && passwordControl.invalid) {
+            @if (passwordControl.hasError('required')) {
+              <span class="error">Password is required</span>
+            } @else if (passwordControl.hasError('minlength')) {
+              <span class="error">Password must be at least 5 characters</span>
+            }
           }
         </div>
 
