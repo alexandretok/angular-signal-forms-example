@@ -1,0 +1,393 @@
+---
+description: Angular Signal Forms API Reference — complete API surface, types, and usage patterns
+alwaysApply: false
+---
+
+# Angular Signal Forms — API Reference
+
+## Package & Version
+
+- Package: `@angular/forms/signals`
+- Stable since: Angular v22
+- Minimum required: Angular v21+
+- No extra install needed — included in `@angular/forms`
+
+## Core Functions
+
+### `form(model, schema?, options?)`
+
+Creates a form from a WritableSignal model.
+
+```ts
+import { form } from '@angular/forms/signals';
+
+const myForm = form(modelSignal);
+const myForm = form(modelSignal, schemaFn);
+const myForm = form(modelSignal, schemaFn, { injector: TestBed.inject(Injector) });
+```
+
+- `model`: `WritableSignal<T>` — the source of truth for form values
+- `schema`: `Schema<T>` — optional function `(path: FieldPath<T>) => void` defining logic
+- `options`: `{ injector?: Injector }` — optional injector for testing
+- Returns: `Field<T>` (navigable form tree)
+
+### `submit(form, handler)` / `submit(form, options)`
+
+Marks all fields as touched, then runs the async handler only if valid.
+
+```ts
+import { submit } from '@angular/forms/signals';
+
+// Simple form
+submit(myForm, async () => {
+  await api.save(model());
+});
+
+// With options (Angular v22+ alternative syntax)
+submit(myForm, {
+  action: async () => { await api.save(model()); },
+});
+
+// Returning server errors
+submit(myForm, async (field) => {
+  const result = await api.save(field.$state.value());
+  if (result.error) {
+    return [{ field: field.username, error: { kind: 'taken', message: 'Taken' } }];
+  }
+});
+```
+
+### `schema<T>(fn)`
+
+Creates a reusable schema for composition:
+
+```ts
+import { schema } from '@angular/forms/signals';
+
+const addressSchema = schema<Address>((s) => {
+  required(s.street);
+  required(s.city);
+});
+```
+
+## Directive
+
+### `FormField` / `[formField]`
+
+Directive for binding form fields to HTML controls. Import `FormField` into your component.
+
+```ts
+@Component({
+  imports: [FormField],
+  template: `<input [formField]="myForm.name" />`
+})
+```
+
+Automatically handles: value sync, disabled, readonly, hidden, name attribute, touched on blur.
+
+**Forbidden HTML attributes** when using `[formField]`:
+- `min`, `max`, `[attr.min]`, `[attr.max]`
+- `value`, `[value]`, `[attr.value]`
+- `[disabled]`, `[readonly]`
+
+## Built-in Validators
+
+All accept an optional `{ message?: string }` options object.
+
+| Validator | Signature | Error Kind |
+|-----------|-----------|------------|
+| `required` | `required(path, opts?)` | `'required'` |
+| `email` | `email(path, opts?)` | `'email'` |
+| `min` | `min(path, value, opts?)` | `'min'` |
+| `max` | `max(path, value, opts?)` | `'max'` |
+| `minLength` | `minLength(path, length, opts?)` | `'minLength'` |
+| `maxLength` | `maxLength(path, length, opts?)` | `'maxLength'` |
+| `pattern` | `pattern(path, regex, opts?)` | `'pattern'` |
+
+### `required` — special `when` option
+
+Only `required` supports conditional activation via `when`:
+
+```ts
+required(s.field, {
+  message: 'Required when active',
+  when: ({ valueOf }) => valueOf(s.isActive),
+});
+```
+
+## Custom Validation
+
+### `validate(path, validatorFn)`
+
+Synchronous custom validation:
+
+```ts
+validate(s.username, ({ value, valueOf, state, stateOf, pathKeys }) => {
+  if (value() === 'admin') {
+    return { kind: 'reserved', message: 'Reserved username' };
+  }
+  return undefined;
+});
+```
+
+### `validateTree(path, validatorFn)`
+
+Validate multiple fields, targeting specific children for errors:
+
+```ts
+validateTree(path, (ctx) => {
+  if (ctx.valueOf(path.firstName).length < 5) {
+    return {
+      kind: 'minLength5',
+      message: 'First name too short',
+      fieldTree: ctx.fieldTree.lastName,
+    };
+  }
+  return null;
+});
+```
+
+### `validateAsync(path, options)`
+
+Async validation — **all four options required**:
+
+```ts
+validateAsync(s.username, {
+  params: ({ value }) => value(),          // Function returning the value
+  factory: (param) => resource({
+    params: param,
+    loader: async ({ params: val }) => { ... },
+  }),
+  onSuccess: (result) => result ? { kind: 'error' } : undefined,
+  onError: () => ({ kind: 'networkError', message: 'Failed' }),
+});
+```
+
+### `validateHttp(path, options)`
+
+HTTP-based async validation:
+
+```ts
+validateHttp(s.username, {
+  request: ({ value }) => `/api/check?username=${value()}`,
+  onSuccess: (response) => response.taken
+    ? { kind: 'taken', message: 'Username taken' }
+    : null,
+  onError: (error) => ({ kind: 'networkError', message: 'Failed' }),
+});
+```
+
+### `validateStandardSchema(path, schema)`
+
+Integration with Zod, Valibot, or any Standard Schema library:
+
+```ts
+import { validateStandardSchema } from '@angular/forms/signals';
+import * as z from 'zod';
+
+const userZod = z.object({ email: z.email(), password: z.string().min(8) });
+
+myForm = form(this.model, (s) => {
+  validateStandardSchema(s, userZod);
+});
+```
+
+Supports dynamic schemas via signals:
+
+```ts
+const dynamicSchema = computed(() => /* ... */);
+myForm = form(this.model, (s) => {
+  validateStandardSchema(s, () => dynamicSchema());
+});
+```
+
+## Field State Rules
+
+### `disabled(path, conditionFn?)`
+
+```ts
+disabled(s.field, ({ valueOf }) => valueOf(s.role) !== 'admin');
+disabled(s.field); // Always disabled
+```
+
+### `hidden(path, conditionFn?)`
+
+```ts
+hidden(s.shippingAddress, ({ valueOf }) => valueOf(s.sameAsBilling));
+```
+
+Hidden fields skip validation. Does NOT remove from DOM — use `@if` in template.
+
+### `readonly(path, conditionFn?)`
+
+```ts
+readonly(s.createdAt);
+readonly(s.field, ({ valueOf }) => valueOf(s.locked));
+```
+
+### `debounce(path, ms)`
+
+Delays model synchronization:
+
+```ts
+debounce(s.searchQuery, 300);
+```
+
+### `metadata(path, data)`
+
+Attach arbitrary static metadata to a field:
+
+```ts
+metadata(s.email, { label: 'Email Address', helpText: 'Enter your work email' });
+```
+
+## Schema Composition
+
+### `apply(path, childSchema)`
+
+Apply a reusable schema to a nested path:
+
+```ts
+apply(s.billingAddress, addressSchema);
+apply(s.shippingAddress, addressSchema);
+```
+
+### `applyEach(arrayPath, elementSchema)`
+
+Apply schema to each element of an array (callback takes ONE arg):
+
+```ts
+applyEach(s.items, (item) => {
+  required(item.name);
+  min(item.quantity, 1);
+});
+
+// Or with a reusable schema
+applyEach(s.friends, friendSchema);
+```
+
+### `applyWhen(path, condition, schemaFn)`
+
+Conditionally apply schema logic (3 arguments required):
+
+```ts
+applyWhen(
+  s.spouse,
+  ({ valueOf }) => valueOf(s.maritalStatus) === 'married',
+  (spousePath) => {
+    required(spousePath.name);
+  },
+);
+```
+
+### `applyWhenValue(path, typeGuard, schema)`
+
+Conditionally apply logic with type narrowing:
+
+```ts
+applyWhenValue(
+  s.startDate,
+  (value): value is SimpleDate => value !== null,
+  dateSchema,
+);
+```
+
+## Types
+
+### `Field<T>`
+
+The navigable form tree. Navigate like your data model:
+- `field.child` → `Field<ChildType>`
+- `field[0]` → `Field<ElementType>` (arrays)
+- `field.$state` → `FieldState<T>`
+
+### `FieldState<T>`
+
+Reactive state object obtained by calling a field or accessing `.$state`:
+
+| Signal | Type | Description |
+|--------|------|-------------|
+| `value` | `WritableSignal<T>` | Current field value |
+| `valid()` | `Signal<boolean>` | All validation passes, no pending |
+| `invalid()` | `Signal<boolean>` | Has validation errors |
+| `errors()` | `Signal<FormError[]>` | Array of errors |
+| `pending()` | `Signal<boolean>` | Async validation in progress |
+| `touched()` | `Signal<boolean>` | User focused+blurred |
+| `dirty()` | `Signal<boolean>` | User modified value |
+| `disabled()` | `Signal<boolean>` | Field or parent disabled |
+| `hidden()` | `Signal<boolean>` | Field marked hidden |
+| `readonly()` | `Signal<boolean>` | Field is readonly |
+| `submittedStatus()` | `Signal<string>` | `'unsubmitted'` / `'submitting'` / `'submitted'` |
+| `reset()` | Method | Reset to initial state |
+| `resetSubmittedStatus()` | Method | Reset submitted status |
+
+### `FormError`
+
+```ts
+interface FormError {
+  readonly kind: string;
+  readonly message?: string;
+}
+```
+
+### `ServerError`
+
+```ts
+interface ServerError {
+  error: FormError;
+  field: Field<any>;
+}
+```
+
+### `Schema<T>`
+
+```ts
+type Schema<T> = (path: FieldPath<T>) => void;
+```
+
+### `FieldContext<T>`
+
+Context passed to validator/rule functions:
+
+```ts
+interface FieldContext<T> {
+  value: Signal<T>;
+  valueOf: <U>(path: FieldPath<U>) => U;
+  state: FieldState<T>;
+  stateOf: <U>(path: FieldPath<U>) => FieldState<U>;
+  fieldTreeOf: <U>(path: FieldPath<U>) => Field<U>;
+  pathKeys: Signal<string[]>;
+}
+```
+
+### `Validator<T>`
+
+```ts
+type Validator<T> = (context: FieldContext<T>) => FormError | undefined | null;
+```
+
+## Compatibility / Migration
+
+From `@angular/forms/signals/compat`:
+
+- `compatForm` — Embed existing `FormGroup`/`FormControl` within a signal form
+- `SignalFormControl` — Drop-in replacement for `FormControl`
+
+```ts
+import { compatForm, SignalFormControl } from '@angular/forms/signals/compat';
+```
+
+## Custom Components
+
+Implement `FormUiControl<T>` interface for custom form controls:
+
+```ts
+import { FormUiControl, FormError } from '@angular/forms/signals';
+
+export class MyControl implements FormUiControl<string> {
+  readonly value = model<string>('');
+  readonly errors = input<readonly FormError[]>();
+}
+```
+
+Or implement Angular's `ControlValueAccessor` interface for compatibility with `[formField]`.

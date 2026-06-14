@@ -1,0 +1,245 @@
+---
+description: Angular Signal Forms — common pitfalls, build errors, and troubleshooting guide
+alwaysApply: false
+---
+
+# Angular Signal Forms — Common Pitfalls & Troubleshooting
+
+## Critical Mistakes Table
+
+| Mistake | WRONG | CORRECT |
+|---------|-------|---------|
+| Access field state | `form.field.valid()` | `form.field().valid()` |
+| Access field value | `form.field.value()` | `form.field().value()` |
+| Set field value | `form.field.set('x')` | `this.model.update(m => ({...m, field: 'x'}))` |
+| Root form state | `form.invalid()` | `form().invalid()` |
+| Double-calling | `form.field()()` | `form.field().value()` |
+| Rules context | `({ touched }) => touched()` | `({ state }) => state.touched()` |
+| Calling paths in schema | `s.foo()` inside schema | `valueOf(s.foo)` from context |
+| applyWhen args | `applyWhen(condition, () => {...})` | `applyWhen(path, condition, schemaFn)` — 3 args |
+| Array length | `form.items().length` | `form.items.length` (structural) |
+| Multi-select arrays | `<select [formField]="form.tags">` (string[]) | `<select multiple [formField]="form.tags">` |
+| readonly attribute | `<input readonly [formField]="...">` | Use `readonly()` rule in schema |
+| min/max attributes | `<input min="18" [formField]="...">` | Use `min()` / `max()` rules in schema |
+| value binding | `<input [value]="x" [formField]="...">` | Do NOT use `[value]` with `[formField]` |
+| `when` option | `pattern(s.x, /.../, {when: ...})` | `when` only works with `required()` |
+| Submit callback | `submit(form, () => { ... })` | `submit(form, async () => { ... })` |
+| Async params | `params: s.field` | `params: ({ value }) => value()` |
+| Async onError | Omitting `onError` | `onError` is REQUIRED in `validateAsync` |
+| resource() API | `request: signal` | `params: signal` |
+| applyEach args | `applyEach(s.items, (item, index) => ...)` | `applyEach(s.items, (item) => ...)` — 1 arg |
+| Nested @for | `$parent.$index` | Use `let outerIdx = $index` |
+| FormState import | `import { FormState }` | `FormState` does NOT exist |
+| Null in model | `signal({ name: null })` | `signal({ name: '' })` |
+| Validate syntax | `validate(s.field, { value } => ...)` | `validate(s.field, ({ value }) => ...)` |
+| Checkbox array | `[formField]="form.tags"` (string[]) | Checkboxes ONLY bind to `boolean` |
+| Validator return | `return null` | Prefer `return undefined` |
+
+## Build Error Fixes
+
+### `Property 'value' does not exist on type 'FieldTree'`
+
+You're accessing state without calling the field first:
+
+```ts
+// WRONG
+const val = this.form.field.value();
+// CORRECT
+const val = this.form.field().value();
+```
+
+### `Property 'set' does not exist on type 'FieldTree'`
+
+Signal Forms are model-driven. Update the model signal, not the form:
+
+```ts
+// WRONG
+this.form.address.street.set('Main St');
+// CORRECT
+this.model.update(m => ({ ...m, address: { ...m.address, street: 'Main St' } }));
+```
+
+### `Type 'string[]' is not assignable to type 'string'`
+
+Binding `[formField]` to an array field with a single-value `<select>`:
+
+```html
+<!-- WRONG -->
+<select [formField]="form.assignees">...</select>
+
+<!-- CORRECT — use select multiple for array fields -->
+<select multiple [formField]="form.assignees">
+  <option value="a">A</option>
+</select>
+```
+
+### `NG8022: Setting the 'readonly/min/max/value' attribute is not allowed`
+
+Remove conflicting HTML attributes and use schema rules instead:
+
+```html
+<!-- WRONG -->
+<input [formField]="form.age" min="18" max="99" />
+
+<!-- CORRECT -->
+<input [formField]="form.age" />
+<!-- Use in schema: min(s.age, 18); max(s.age, 99); -->
+```
+
+### `TS2322: Type 'string[]' is not assignable to type 'boolean'`
+
+Binding a checkbox to an array field:
+
+```html
+<!-- WRONG — tags is string[] -->
+<input type="checkbox" [formField]="form.tags" />
+
+<!-- CORRECT — use select multiple -->
+<select multiple [formField]="form.tags">
+  <option value="a">A</option>
+</select>
+
+<!-- OR map to boolean fields -->
+<!-- model = signal({ hasWifi: false, hasGym: false }) -->
+<input type="checkbox" [formField]="form.hasWifi" />
+```
+
+### `'when' does not exist in type` for pattern/email/min/max
+
+`when` ONLY works with `required()`. Use `applyWhen` for conditional non-required validators:
+
+```ts
+// WRONG
+pattern(s.ssn, /^\d{3}-\d{2}-\d{4}$/, { when: isJoint });
+
+// CORRECT
+applyWhen(s.ssn, isJoint, (ssnPath) => {
+  pattern(ssnPath, /^\d{3}-\d{2}-\d{4}$/);
+});
+```
+
+### `Expected 3 arguments, but got 2` for applyWhen
+
+Missing the path argument:
+
+```ts
+// WRONG
+applyWhen(isJoint, () => { ... });
+
+// CORRECT — applyWhen(path, condition, schemaFn)
+applyWhen(s.spouse, ({ valueOf }) => valueOf(s.status) === 'joint', (spousePath) => {
+  required(spousePath.name);
+});
+```
+
+### `Module has no exported member 'FormState'`
+
+`FormState` does not exist. Access state through calling the field:
+
+```ts
+// WRONG
+import { FormState } from '@angular/forms/signals';
+
+// CORRECT — just use the field
+const state = this.myForm.email(); // This IS the FieldState
+state.valid();
+state.touched();
+```
+
+### `No pipe found with name 'number'` / `'json'` / `'date'`
+
+Pipes need to be imported or use computed:
+
+```html
+<!-- WRONG (if pipe not imported) -->
+{{ totalPrice() | number:'1.2-2' }}
+
+<!-- CORRECT — format in the component -->
+totalPriceFormatted = computed(() => this.totalPrice().toFixed(2));
+<!-- then: -->
+{{ totalPriceFormatted() }}
+```
+
+### `$parent.$index` in nested @for loops
+
+Angular doesn't have `$parent`:
+
+```html
+<!-- WRONG -->
+@for (item of items; track $index) {
+  @for (sub of item.subs; track $index) {
+    <button (click)="remove($parent.$index, $index)">X</button>
+  }
+}
+
+<!-- CORRECT -->
+@for (item of items; track $index; let outerIdx = $index) {
+  @for (sub of item.subs; track $index) {
+    <button (click)="remove(outerIdx, $index)">X</button>
+  }
+}
+```
+
+## Key Behavioral Notes
+
+### Schema Function Runs Once
+
+The schema function runs **only once** during form creation. Do NOT use dynamic `if` statements to conditionally call binding functions. Use `applyWhen` instead.
+
+### Validation Doesn't Short-Circuit
+
+All validation rules run — validation doesn't stop after the first error. Multiple errors can coexist.
+
+### Validation Order
+
+1. Synchronous rules run on every value change
+2. Async rules run only after ALL sync rules pass
+3. Field state signals update
+
+### Hidden/Disabled Fields Skip Validation
+
+When a field is `hidden` or `disabled`, validation rules don't run.
+
+### Touched on Blur
+
+`touched()` becomes `true` when a user focuses AND blurs a field through user interaction (not programmatically). Disabled/hidden fields don't become touched.
+
+### State Propagation
+
+- `valid()` on a parent is `true` only if ALL descendants are valid
+- `touched()` on a parent is `true` if ANY descendant is touched
+- `dirty()` on a parent is `true` if ANY descendant is dirty
+- `disabled()` on a child is `true` if the child OR any ancestor is disabled
+
+### Never Reassign the Model Signal
+
+```ts
+// WRONG — form still points to old signal
+this.model = signal(newData);
+
+// CORRECT — update the existing signal
+this.model.set(newData);
+this.model.update(m => ({ ...m, ...newData }));
+```
+
+### linkedSignal for Readonly Signals
+
+If your source is a readonly signal (e.g., from NgRx `selectSignal()`), wrap with `linkedSignal()`:
+
+```ts
+import { linkedSignal } from '@angular/core';
+
+readonly source = this.store.selectSignal(selectUser);
+readonly model = linkedSignal(this.source);
+readonly userForm = form(this.model, /* ... */);
+```
+
+## Testing Tips
+
+- Provide an injector when creating forms in tests:
+  ```ts
+  form(model, schema, { injector: TestBed.inject(Injector) });
+  ```
+- Use `model.set()` / `model.update()` to simulate value changes
+- Use `field.$state.value.set()` to simulate user input
+- Check `field.$state.errors()`, `field.$state.valid()` for assertions

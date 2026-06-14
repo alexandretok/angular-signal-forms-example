@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Angular build output
+frontend/dist/
+frontend/.angular/
+
+# Backend
+backend/dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test coverage
+coverage/
+
+# Misc
+*.tgz

@@ -1,0 +1,404 @@
+---
+description: Angular Signal Forms - mandatory rules for all form-related code in Angular v21+ / v22+ applications
+alwaysApply: true
+---
+
+# Angular Signal Forms
+
+Signal Forms are the **recommended and only** approach for handling forms in modern Angular applications (v21+). They provide a reactive, type-safe, and model-driven way to manage form state using Angular Signals.
+
+## Critical Rules
+
+- **ALWAYS** use the Signal Forms API from `@angular/forms/signals` for all form-related functionality.
+- **NEVER** use `FormControl`, `FormGroup`, `FormArray`, or `FormBuilder` from `@angular/forms`. Signal Forms replace these entirely.
+- **NEVER** use `null` or `undefined` as initial values in the model. Use `''` for strings, `0` for numbers, `[]` for arrays, `false` for booleans.
+- **NEVER** use HTML attributes `min`, `max`, `value`, `[value]`, `[disabled]`, `[readonly]` on elements using `[formField]`. Use schema rules instead.
+- Signal Forms does **NOT** have a builder pattern.
+
+## Imports
+
+Everything comes from `@angular/forms/signals`:
+
+```ts
+import {
+  // Core
+  form, FormField, submit,
+  // Validators
+  required, email, min, max, minLength, maxLength, pattern,
+  // Field state rules
+  disabled, hidden, readonly, debounce,
+  // Schema helpers
+  schema, applyWhen, applyEach,
+  // Custom validation
+  validate, validateAsync, validateHttp, validateStandardSchema,
+  // Metadata
+  metadata,
+} from '@angular/forms/signals';
+```
+
+## Creating a Form
+
+Use the `form()` function with a WritableSignal model. The form structure mirrors your data shape automatically.
+
+```ts
+import { Component, signal } from '@angular/core';
+import { form, FormField, required, email } from '@angular/forms/signals';
+
+@Component({
+  imports: [FormField],
+  // ...
+})
+export class MyComponent {
+  model = signal({
+    name: '',       // NEVER null
+    email: '',      // NEVER null
+    age: 0,         // NEVER null
+    items: [] as string[],  // NEVER null
+  });
+
+  myForm = form(this.model, (s) => {
+    required(s.name);
+    required(s.email);
+    email(s.email);
+  });
+}
+```
+
+## Template Binding
+
+Import `FormField` and use the `[formField]` directive:
+
+```html
+<input [formField]="myForm.name" />
+<input type="email" [formField]="myForm.email" />
+<input type="number" [formField]="myForm.age" />
+<input type="checkbox" [formField]="myForm.isActive" />
+<select [formField]="myForm.country">
+  <option value="us">US</option>
+</select>
+<select multiple [formField]="myForm.tags">
+  <option value="a">A</option>
+</select>
+```
+
+## FormField vs FieldState (Critical Concept)
+
+A `FormField` is the structural tree you navigate. You **MUST CALL** it as a function to get the `FieldState` with reactive signals.
+
+```ts
+// FormField (structural) — navigate to fields
+myForm.name;              // FormField — NO state signals here
+
+// FieldState (reactive) — CALL the field
+myForm.name();            // FieldState — has .value(), .valid(), etc.
+myForm.name().touched();  // Signal<boolean>
+myForm.name().value();    // Signal<string>
+
+// WRONG:
+myForm.name.touched();    // ERROR: touched() doesn't exist on FormField
+myForm().name.touched();  // ERROR: myForm() is FieldState, not navigable
+```
+
+In templates:
+```html
+<!-- CORRECT -->
+@if (myForm.email().touched() && myForm.email().invalid()) {
+  <span>{{ myForm.email().errors()[0].message }}</span>
+}
+
+<!-- WRONG -->
+@if (myForm.email.touched()) { ... }
+```
+
+## Accessing State
+
+```ts
+// Form-level (call the form root)
+myForm().valid();     // Signal<boolean>
+myForm().invalid();   // Signal<boolean>
+myForm().dirty();     // Signal<boolean>
+myForm().touched();   // Signal<boolean>
+myForm().pending();   // Signal<boolean>
+myForm().errors();    // Signal<ValidationError[]>
+myForm().value();     // Full model value
+myForm().reset();     // Reset the form
+
+// Field-level (call the field)
+myForm.name().valid();
+myForm.name().dirty();
+myForm.name().touched();
+myForm.name().errors();
+myForm.name().value();
+
+// Array length — structural, NO parentheses
+myForm.items.length;  // NOT myForm.items().length
+```
+
+## Validation
+
+Define rules in the schema function passed to `form()`:
+
+```ts
+myForm = form(this.model, (s) => {
+  required(s.name, { message: 'Name is required' });
+  email(s.email, { message: 'Invalid email' });
+  min(s.age, 18);
+  max(s.age, 100);
+  minLength(s.password, 8);
+  maxLength(s.bio, 500);
+  pattern(s.zipCode, /^\d{5}$/);
+});
+```
+
+### Conditional Required (only `required` supports `when`)
+
+```ts
+required(s.driversLicense, {
+  when({ valueOf }) {
+    return valueOf(s.age) >= 16;
+  },
+});
+```
+
+### Custom Validation
+
+```ts
+validate(s.username, ({ value }) => {
+  if (value() === 'admin') {
+    return { kind: 'reserved', message: 'Username is reserved' };
+  }
+  return undefined; // No error — return undefined, NOT null
+});
+```
+
+### Cross-Field Validation
+
+```ts
+validate(s.confirmPassword, ({ value, valueOf }) => {
+  if (value() !== valueOf(s.password)) {
+    return { kind: 'mismatch', message: 'Passwords do not match' };
+  }
+  return undefined;
+});
+```
+
+### Validator Context
+
+The callback receives a context object:
+
+```ts
+validate(s.field, ({
+  value,      // Signal<T>: current field value
+  valueOf,    // (path) => T: read OTHER fields' values
+  state,      // FieldState<T>: this field's state
+  stateOf,    // (path) => FieldState: other fields' state
+  pathKeys,   // Signal<string[]>: path from root
+}) => { ... });
+```
+
+## Async Validation
+
+Use `validateAsync()` — all four options are **REQUIRED**:
+
+```ts
+validateAsync(s.username, {
+  params: ({ value }) => value(),          // MUST be a function
+  factory: (username) => resource({
+    params: username,                      // Use 'params', NOT 'request'
+    loader: async ({ params: val }) => { /* ... */ },
+  }),
+  onSuccess: (result) => result.taken
+    ? { kind: 'taken', message: 'Already taken' }
+    : undefined,
+  onError: () => ({ kind: 'error', message: 'Check failed' }),  // REQUIRED
+});
+```
+
+## HTTP Validation
+
+```ts
+validateHttp(s.username, {
+  request: ({ value }) => `/api/check?username=${value()}`,
+  onSuccess: (response) => response.taken
+    ? { kind: 'taken', message: 'Already taken' }
+    : null,
+  onError: () => ({ kind: 'error', message: 'Network error' }),
+});
+```
+
+## Field State Rules
+
+```ts
+disabled(s.field, ({ valueOf }) => valueOf(s.role) !== 'admin');
+hidden(s.shippingAddress, ({ valueOf }) => valueOf(s.sameAsBilling));
+readonly(s.createdAt);
+debounce(s.searchQuery, 300);
+```
+
+## Submitting
+
+The callback **MUST** be `async`:
+
+```ts
+import { submit } from '@angular/forms/signals';
+
+onSubmit() {
+  submit(this.myForm, async () => {
+    await this.apiService.save(this.model());
+  });
+}
+```
+
+Disable the submit button:
+```html
+<button [disabled]="myForm().invalid() || myForm().pending()">Submit</button>
+```
+
+## Arrays with applyEach
+
+Callback takes **ONE** argument only (no index):
+
+```ts
+applyEach(s.items, (item) => {
+  required(item.name);
+  min(item.quantity, 1);
+});
+```
+
+Template iteration:
+```html
+@for (item of myForm.items; track $index) {
+  <input [formField]="item.name" />
+  <button (click)="removeItem($index)">Remove</button>
+}
+```
+
+Add/remove items by updating the model signal:
+```ts
+addItem() {
+  this.model.update(m => ({ ...m, items: [...m.items, { name: '', quantity: 1 }] }));
+}
+removeItem(index: number) {
+  this.model.update(m => ({ ...m, items: m.items.filter((_, i) => i !== index) }));
+}
+```
+
+## Conditional Validation with applyWhen
+
+Three arguments: path, condition, schema function:
+
+```ts
+applyWhen(
+  s.spouse,
+  ({ valueOf }) => valueOf(s.maritalStatus) === 'married',
+  (spousePath) => {
+    required(spousePath.name);
+    required(spousePath.email);
+  },
+);
+```
+
+## Reusable Schemas
+
+```ts
+import { schema } from '@angular/forms/signals';
+
+const addressSchema = schema<Address>((s) => {
+  required(s.street);
+  required(s.city);
+  required(s.zipCode);
+  pattern(s.zipCode, /^\d{5}$/);
+});
+
+// Compose into larger form
+orderForm = form(this.orderModel, (s) => {
+  apply(s.billingAddress, addressSchema);
+  apply(s.shippingAddress, addressSchema);
+});
+```
+
+## Nested @for Loops
+
+Angular does **NOT** have `$parent`. Store outer index with `let`:
+
+```html
+@for (item of myForm.items; track $index; let outerIdx = $index) {
+  @for (option of item.options; track $index) {
+    <button (click)="removeOption(outerIdx, $index)">Remove</button>
+  }
+}
+```
+
+## Updating Values
+
+Signal Forms are model-driven. **NEVER** try to `.set()` on the form tree. Update the model signal:
+
+```ts
+// WRONG
+this.myForm.name.set('John');
+
+// CORRECT
+this.model.update(m => ({ ...m, name: 'John' }));
+```
+
+## Standard Schema Integration (Zod, Valibot)
+
+```ts
+import { validateStandardSchema } from '@angular/forms/signals';
+import * as z from 'zod';
+
+const userSchema = z.object({
+  email: z.email(),
+  password: z.string().min(8),
+});
+
+userForm = form(this.model, (s) => {
+  validateStandardSchema(s, userSchema);
+});
+```
+
+## Error Structure
+
+```ts
+interface ValidationError {
+  readonly kind: string;
+  readonly message?: string;
+}
+```
+
+- Return `undefined` (or `null`) from validators when there's no error.
+- Prefer `undefined` over `null`.
+
+## Server Errors on Submit
+
+```ts
+submit(this.myForm, async (field) => {
+  const error = await this.api.save(field.$state.value());
+  if (error) {
+    return [{
+      field: field.username,
+      error: { kind: 'taken', message: 'Username already taken' },
+    }];
+  }
+});
+```
+
+## Paths are NOT Signals
+
+Inside the schema callback, paths (`s.field`) are **NOT** callable:
+
+```ts
+// WRONG
+applyWhen(s.foo, () => s.foo() === 'x', ...);
+
+// CORRECT
+applyWhen(s.foo, ({ valueOf }) => valueOf(s.foo) === 'x', ...);
+```
+
+## Migration from Reactive Forms
+
+For incremental migration, `@angular/forms/signals/compat` provides:
+- `compatForm` — embed existing `FormGroup`/`FormControl` in a signal form
+- `SignalFormControl` — drop-in for `FormControl`
+
+Never reassign the model signal. Always use `.set()` or `.update()`.
