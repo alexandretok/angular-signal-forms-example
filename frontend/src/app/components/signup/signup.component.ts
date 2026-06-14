@@ -29,11 +29,11 @@ export class SignupComponent {
     phone: '',
   });
 
-  signupForm = form(this.model, (s) => {
-    required(s.email, { message: 'Email is required' });
-    email(s.email, { message: 'Please enter a valid email address' });
-    debounce(s.email, 1000);
-    validateHttp(s.email, {
+  signupForm = form(this.model, (path) => {
+    required(path.email, { message: 'Email is required' });
+    email(path.email, { message: 'Please enter a valid email address' });
+    debounce(path.email, 1000);
+    validateHttp(path.email, {
       request: ({ value }) => `/api/check-email?email=${value()}`,
       onSuccess: (response: any) =>
         response.exists
@@ -42,14 +42,14 @@ export class SignupComponent {
       onError: () => ({ kind: 'networkError', message: 'Could not verify email availability' }),
     });
 
-    required(s.password, { message: 'Password is required' });
-    minLength(s.password, 5, { message: 'Password must be at least 5 characters' });
+    required(path.password, { message: 'Password is required' });
+    minLength(path.password, 5, { message: 'Password must be at least 5 characters' });
 
-    required(s.phone, {
+    required(path.phone, {
       message: 'Phone number is required',
-      when: ({ valueOf }) => valueOf(s.smsNotifications),
+      when: ({ valueOf }) => valueOf(path.smsNotifications),
     });
-    validate(s.phone, ({ value }) => {
+    validate(path.phone, ({ value }) => {
       const phone = value();
       if (!phone) return undefined;
       if (!PHONE_PATTERN.test(phone)) {
