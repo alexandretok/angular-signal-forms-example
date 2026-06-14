@@ -41,6 +41,16 @@
           }
         </div>
 
+        <div class="form-group checkbox-group">
+          <label class="checkbox-label">
+            <input
+              type="checkbox"
+              [formField]="signupForm.smsNotifications"
+            />
+            <span>Receive SMS notifications</span>
+          </label>
+        </div>
+
         <div class="form-group">
           <label>Phone Number</label>
           <app-phone-input [formField]="signupForm.phone" />

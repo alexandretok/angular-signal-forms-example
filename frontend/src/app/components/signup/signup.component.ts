@@ -25,6 +25,7 @@ export class SignupComponent {
   model = signal<SignupModel>({
     email: '',
     password: '',
+    smsNotifications: true,
     phone: '',
   });
 
@@ -44,7 +45,10 @@ export class SignupComponent {
     required(s.password, { message: 'Password is required' });
     minLength(s.password, 5, { message: 'Password must be at least 5 characters' });
 
-    required(s.phone, { message: 'Phone number is required' });
+    required(s.phone, {
+      message: 'Phone number is required',
+      when: ({ valueOf }) => valueOf(s.smsNotifications),
+    });
     validate(s.phone, ({ value }) => {
       const phone = value();
       if (!phone) return undefined;
