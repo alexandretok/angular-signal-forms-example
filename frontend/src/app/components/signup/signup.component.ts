@@ -10,11 +10,9 @@ import {
   validateHttp,
   debounce,
 } from '@angular/forms/signals';
-import {
-  PhoneInputComponent,
-  PhoneNumber,
-  SUPPORTED_COUNTRIES,
-} from '../phone-input/phone-input.component';
+import { PhoneInputComponent } from '../phone-input/phone-input.component';
+import { PHONE_PATTERN } from '../phone-input/phone-input.model';
+import { SignupModel } from './signup.model';
 
 @Component({
   selector: 'app-signup',
@@ -24,16 +22,16 @@ import {
   styleUrl: './signup.component.css',
 })
 export class SignupComponent {
-  model = signal({
+  model = signal<SignupModel>({
     email: '',
     password: '',
-    phone: { countryCode: 'PT', number: '' } as PhoneNumber,
+    phone: '',
   });
 
   signupForm = form(this.model, (s) => {
     required(s.email, { message: 'Email is required' });
     email(s.email, { message: 'Please enter a valid email address' });
-    debounce(s.email, 500);
+    debounce(s.email, 1000);
     validateHttp(s.email, {
       request: ({ value }) => `/api/check-email?email=${value()}`,
       onSuccess: (response: any) =>
@@ -48,10 +46,10 @@ export class SignupComponent {
 
     required(s.phone, { message: 'Phone number is required' });
     validate(s.phone, ({ value }) => {
-      const phone = value() as PhoneNumber;
-      const country = SUPPORTED_COUNTRIES.find((c) => c.code === phone.countryCode);
-      if (!country?.pattern.test(phone.number)) {
-        return { kind: 'invalidPhone', message: 'Invalid phone number' };
+      const phone = value();
+      if (!phone) return undefined;
+      if (!PHONE_PATTERN.test(phone)) {
+        return { kind: 'invalidPhone', message: 'Phone number must be exactly 9 digits' };
       }
       return undefined;
     });

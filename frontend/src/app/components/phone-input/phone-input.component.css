@@ -1,0 +1,18 @@
+.phone-number-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.phone-number-input:disabled {
+  background: #f3f4f6;
+  cursor: not-allowed;
+}
+
+.phone-number-input:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+}

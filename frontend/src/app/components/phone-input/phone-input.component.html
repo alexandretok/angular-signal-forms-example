@@ -1,0 +1,9 @@
+<input
+  type="tel"
+  class="phone-number-input"
+  [value]="displayValue()"
+  (input)="onInput($any($event.target).value)"
+  (blur)="onBlur()"
+  [disabled]="disabled()"
+  placeholder="XXX XXX XXX"
+/>
