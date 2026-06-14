@@ -119,3 +119,10 @@ input:focus {
   font-weight: 600;
   color: #1f2937;
 }
+
+.submit-error {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #dc2626;
+  text-align: center;
+}

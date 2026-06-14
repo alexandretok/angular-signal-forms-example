@@ -9,7 +9,7 @@
         <p>Account created successfully!</p>
       </div>
     } @else {
-      <form (ngSubmit)="onSubmit()">
+      <form (submit)="$event.preventDefault(); onSubmit()">
         <div class="form-group">
           <label for="email">Email</label>
           <input
@@ -62,6 +62,10 @@
             Sign Up
           }
         </button>
+
+        @if (submitError()) {
+          <p class="submit-error">{{ submitError() }}</p>
+        }
       </form>
     }
   </div>

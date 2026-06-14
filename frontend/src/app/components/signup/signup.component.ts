@@ -58,12 +58,31 @@ export class SignupComponent {
   });
 
   submitted = signal(false);
+  submitError = signal('');
 
   onSubmit(): void {
     submit(this.signupForm, {
       action: async () => {
-        this.submitted.set(true);
-        console.log('Form submitted:', this.model());
+        this.submitError.set('');
+
+        try {
+          const response = await fetch('/api/signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this.model()),
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            this.submitError.set(data.error || 'Signup failed');
+            return;
+          }
+
+          this.submitted.set(true);
+        } catch {
+          this.submitError.set('Network error. Please try again.');
+        }
       },
       onInvalid(field, detail) {
         console.log('Form invalid:', field, detail);
