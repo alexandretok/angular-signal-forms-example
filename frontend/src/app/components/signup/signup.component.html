@@ -1,0 +1,68 @@
+<div class="signup-container">
+  <div class="signup-card">
+    <h1>Create Account</h1>
+    <p class="subtitle">Fill in the details below to get started</p>
+
+    @if (submitted()) {
+      <div class="success-message">
+        <span class="success-icon">&#10003;</span>
+        <p>Account created successfully!</p>
+      </div>
+    } @else {
+      <form (ngSubmit)="onSubmit()">
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input
+            id="email"
+            type="email"
+            [formField]="signupForm.email"
+            placeholder="you@example.com"
+            autocomplete="email"
+          />
+          @if (signupForm.email().touched() && signupForm.email().errors().length > 0) {
+            <span class="error">{{ signupForm.email().errors()[0].message }}</span>
+          }
+          @if (signupForm.email().pending()) {
+            <span class="pending">Checking availability...</span>
+          }
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input
+            id="password"
+            type="password"
+            [formField]="signupForm.password"
+            placeholder="At least 5 characters"
+            autocomplete="new-password"
+          />
+          @if (signupForm.password().touched() && signupForm.password().errors().length > 0) {
+            <span class="error">{{ signupForm.password().errors()[0].message }}</span>
+          }
+        </div>
+
+        <div class="form-group">
+          <label>Phone Number</label>
+          <app-phone-input [formField]="signupForm.phone" />
+          @if (signupForm.phone().touched() && signupForm.phone().errors().length > 0) {
+            <span class="error">{{ signupForm.phone().errors()[0].message }}</span>
+          }
+        </div>
+
+        <button
+          type="submit"
+          class="submit-btn"
+          [disabled]="signupForm().invalid() || signupForm().pending() || signupForm().submitting()"
+        >
+          @if (signupForm().pending()) {
+            Validating...
+          } @else if (signupForm().submitting()) {
+            Submitting...
+          } @else {
+            Sign Up
+          }
+        </button>
+      </form>
+    }
+  </div>
+</div>
