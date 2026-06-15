@@ -16,13 +16,24 @@ export class SignupComponent {
     email: '',
     password: '',
     smsNotifications: true,
-    phone: '',
+    phones: [''],
   });
 
   signupForm = form(this.model, validationSchema);
 
   submitted = signal(false);
   submitError = signal('');
+
+  addPhone(): void {
+    this.model.update((model) => ({ ...model, phones: [...model.phones, ''] }));
+  }
+
+  removePhone(index: number): void {
+    this.model.update((model) => ({
+      ...model,
+      phones: model.phones.filter((_, i) => i !== index),
+    }));
+  }
 
   onSubmit(): void {
     submit(this.signupForm, {

@@ -54,11 +54,19 @@
         </div>
 
         <div class="form-group">
-          <label>Phone Number</label>
-          <app-phone-input [formField]="signupForm.phone" />
-          @if (signupForm.phone().touched() && signupForm.phone().errors().length > 0) {
-            <span class="error">{{ signupForm.phone().errors()[0].message }}</span>
+          <label>Phone Numbers</label>
+          @for (phone of signupForm.phones; track $index) {
+            <div class="phone-row">
+              <app-phone-input [formField]="phone" />
+              @if (signupForm.phones.length > 1) {
+                <button type="button" class="remove-btn" (click)="removePhone($index)">&#10005;</button>
+              }
+            </div>
+            @if (phone().touched() && phone().errors().length > 0) {
+              <span class="error">{{ phone().errors()[0].message }}</span>
+            }
           }
+          <button type="button" class="add-btn" (click)="addPhone()">+ Add phone number</button>
         </div>
 
         <button

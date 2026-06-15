@@ -7,6 +7,7 @@ import {
   validateAsync,
   debounce,
   validateHttp,
+  applyEach,
 } from '@angular/forms/signals';
 import { resource } from '@angular/core';
 import { PHONE_PATTERN } from '../phone-input/phone-input.model';
@@ -46,17 +47,19 @@ export const validationSchema = schema<SignupModel>((path) => {
   required(path.password, { message: 'Password is required' });
   minLength(path.password, 5, { message: 'Password must be at least 5 characters' });
 
-  required(path.phone, {
-    message: 'Phone number is required',
-    when: ({ valueOf }) => valueOf(path.smsNotifications),
-  });
-  validate(path.phone, ({ value, valueOf }) => {
-    if (!valueOf(path.smsNotifications)) return undefined;
-    const phone = value();
-    if (!phone) return undefined;
-    if (!PHONE_PATTERN.test(phone)) {
-      return { kind: 'invalidPhone', message: 'Phone number must be exactly 9 digits' };
-    }
-    return undefined;
+  applyEach(path.phones, (phone) => {
+    required(phone, {
+      message: 'Phone number is required',
+      when: ({ valueOf }) => valueOf(path.smsNotifications),
+    });
+    validate(phone, ({ value, valueOf }) => {
+      if (!valueOf(path.smsNotifications)) return undefined;
+      const val = value();
+      if (!val) return undefined;
+      if (!PHONE_PATTERN.test(val)) {
+        return { kind: 'invalidPhone', message: 'Phone number must be exactly 9 digits' };
+      }
+      return undefined;
+    });
   });
 });
