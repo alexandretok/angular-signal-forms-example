@@ -3,9 +3,9 @@ import {
   required,
   email,
   minLength,
-  pattern,
   validate,
   validateAsync,
+  validateTree,
   debounce,
   validateHttp,
   applyEach,
@@ -67,6 +67,19 @@ export const validationSchema = schema<SignupModel>((path) => {
   required(path.address.street, { message: 'Street is required' });
   required(path.address.city, { message: 'City is required' });
   required(path.address.postalCode, { message: 'Postal code is required' });
-  pattern(path.address.postalCode, /^\d{4}-\d{3}$/, { message: 'Format must be XXXX-XXX' });
   required(path.address.country, { message: 'Country is required' });
+
+  validateTree(path.address, ({ valueOf, fieldTreeOf }) => {
+    const country = valueOf(path.address.country);
+    const postalCode = valueOf(path.address.postalCode);
+    if (!country || !postalCode) return undefined;
+
+    if (country === 'PT' && !/^\d{4}-\d{3}$/.test(postalCode)) {
+      return { kind: 'postalMismatch', message: 'Portuguese postal code must be XXXX-XXX', fieldTree: fieldTreeOf(path.address.postalCode) };
+    }
+    if (country === 'BR' && !/^\d{5}-\d{3}$/.test(postalCode)) {
+      return { kind: 'postalMismatch', message: 'Brazilian postal code must be XXXXX-XXX', fieldTree: fieldTreeOf(path.address.postalCode) };
+    }
+    return undefined;
+  });
 });
