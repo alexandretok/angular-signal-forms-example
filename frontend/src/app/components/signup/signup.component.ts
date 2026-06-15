@@ -17,6 +17,12 @@ export class SignupComponent {
     password: '',
     smsNotifications: true,
     phones: [''],
+    address: {
+      street: '',
+      city: '',
+      postalCode: '',
+      country: '',
+    },
   });
 
   signupForm = form(this.model, validationSchema);

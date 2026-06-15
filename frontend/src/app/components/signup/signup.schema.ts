@@ -3,6 +3,7 @@ import {
   required,
   email,
   minLength,
+  pattern,
   validate,
   validateAsync,
   debounce,
@@ -62,4 +63,10 @@ export const validationSchema = schema<SignupModel>((path) => {
       return undefined;
     });
   });
+
+  required(path.address.street, { message: 'Street is required' });
+  required(path.address.city, { message: 'City is required' });
+  required(path.address.postalCode, { message: 'Postal code is required' });
+  pattern(path.address.postalCode, /^\d{4}-\d{3}$/, { message: 'Format must be XXXX-XXX' });
+  required(path.address.country, { message: 'Country is required' });
 });

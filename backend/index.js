@@ -44,17 +44,18 @@ app.get('/api/check-email', (req, res) => {
 });
 
 app.post('/api/signup', (req, res) => {
-  const { email, password, phone } = req.body;
+  const { email, password, phones, address } = req.body;
 
-  if (!email || !password || !phone) {
-    return res.status(400).json({ error: 'All fields are required' });
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
   }
 
   setTimeout(() => {
     console.log('--- New Signup Received ---');
     console.log('Email:', email);
     console.log('Password:', password);
-    console.log('Phone:', JSON.stringify(phone));
+    console.log('Phones:', JSON.stringify(phones));
+    console.log('Address:', JSON.stringify(address));
     console.log('--------------------------');
 
     return res.status(201).json({ success: true, message: 'User registered successfully' });

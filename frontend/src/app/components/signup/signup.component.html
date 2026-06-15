@@ -69,6 +69,63 @@
           <button type="button" class="add-btn" (click)="addPhone()">+ Add phone number</button>
         </div>
 
+        <fieldset class="address-fieldset">
+          <legend>Address</legend>
+
+          <div class="form-group">
+            <label for="street">Street</label>
+            <input
+              id="street"
+              type="text"
+              [formField]="signupForm.address.street"
+              placeholder="Rua Example, 123"
+            />
+            @if (signupForm.address.street().touched() && signupForm.address.street().errors().length > 0) {
+              <span class="error">{{ signupForm.address.street().errors()[0].message }}</span>
+            }
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="city">City</label>
+              <input
+                id="city"
+                type="text"
+                [formField]="signupForm.address.city"
+                placeholder="Lisbon"
+              />
+              @if (signupForm.address.city().touched() && signupForm.address.city().errors().length > 0) {
+                <span class="error">{{ signupForm.address.city().errors()[0].message }}</span>
+              }
+            </div>
+
+            <div class="form-group">
+              <label for="postalCode">Postal Code</label>
+              <input
+                id="postalCode"
+                type="text"
+                [formField]="signupForm.address.postalCode"
+                placeholder="1000-001"
+              />
+              @if (signupForm.address.postalCode().touched() && signupForm.address.postalCode().errors().length > 0) {
+                <span class="error">{{ signupForm.address.postalCode().errors()[0].message }}</span>
+              }
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="country">Country</label>
+            <select id="country" [formField]="signupForm.address.country">
+              <option value="">Select a country</option>
+              <option value="PT">Portugal</option>
+              <option value="BR">Brazil</option>
+            </select>
+            @if (signupForm.address.country().touched() && signupForm.address.country().errors().length > 0) {
+              <span class="error">{{ signupForm.address.country().errors()[0].message }}</span>
+            }
+          </div>
+        </fieldset>
+
         <button
           type="submit"
           class="submit-btn"
