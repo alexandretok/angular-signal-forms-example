@@ -14,22 +14,6 @@ const usersDB = [
   'email@example.com',
 ];
 
-app.post('/api/check-email', (req, res) => {
-  const { email } = req.body;
-
-  if (!email) {
-    return res.status(400).json({ error: 'Email is required' });
-  }
-
-  const exists = usersDB.includes(email.toLowerCase());
-
-  if (exists) {
-    return res.status(200).json({ exists: true, message: 'Email found in the database' });
-  }
-
-  return res.status(404).json({ exists: false, message: 'Email not found in the database' });
-});
-
 app.get('/api/check-email', (req, res) => {
   const { email } = req.query;
 

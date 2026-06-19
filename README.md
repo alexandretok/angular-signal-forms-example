@@ -47,7 +47,6 @@ The API runs at `http://localhost:3000`.
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/check-email?email=...` | Checks if an email exists (1s delay) |
-| `POST` | `/api/check-email` | Same check via request body |
 | `POST` | `/api/signup` | Accepts signup payload and logs it to the console (1s delay, no persistence) |
 
 ### Frontend (port 8000)
